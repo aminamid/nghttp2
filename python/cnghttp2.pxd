@@ -266,6 +266,12 @@ cdef extern from 'nghttp2/nghttp2.h':
                                     const nghttp2_nv *nva, size_t nvlen,
                                     void *stream_user_data)
 
+    int nghttp2_submit_goaway(nghttp2_session *session, uint8_t flags,
+                                    int32_t last_stream_id,
+                                         uint32_t error_code,
+                                         const uint8_t *opaque_data,
+                                         size_t opaque_data_len)
+
     int nghttp2_submit_settings(nghttp2_session *session, uint8_t flags,
                                 const nghttp2_settings_entry *iv, size_t niv)
 

@@ -863,6 +863,25 @@ cdef class _HTTP2SessionCore(_HTTP2SessionCoreBase):
             raise Exception('nghttp2_submit_settings failed: {}'.format\
                             (_strerror(rv)))
 
+        
+    def goaway(self, error_code=cnghttp2.NGHTTP2_NO_ERROR, body=b''):
+        cdef uint8_t *opaque_data
+        cdef int32_t last_stream_id
+        cdef int rv
+
+        opaque_data = <uint8_t*>body 
+
+        last_stream_id = 0
+        logging.debug('submit_goaway, stream_id:%d', last_stream_id )
+        
+        rv = cnghttp2.nghttp2_submit_goaway(self.session,
+                                            cnghttp2.NGHTTP2_FLAG_NONE,
+                                            last_stream_id, error_code,
+                                            opaque_data, sizeof(body))
+        if rv != 0:
+            raise Exception('nghttp2_submit_goaway failed: {}'.format\
+                            (_strerror(rv)))
+
     def send_response(self, handler):
         cdef cnghttp2.nghttp2_data_provider prd
         cdef cnghttp2.nghttp2_data_provider *prd_ptr
