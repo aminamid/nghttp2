@@ -453,12 +453,14 @@ int nghttp2_http_on_request_headers(nghttp2_stream *stream,
     }
     stream->content_length = -1;
   } else {
+/*
     if ((stream->http_flags & NGHTTP2_HTTP_FLAG_REQ_HEADERS) !=
             NGHTTP2_HTTP_FLAG_REQ_HEADERS ||
         (stream->http_flags &
          (NGHTTP2_HTTP_FLAG__AUTHORITY | NGHTTP2_HTTP_FLAG_HOST)) == 0) {
       return -1;
     }
+*/
     if (!check_path(stream)) {
       return -1;
     }
