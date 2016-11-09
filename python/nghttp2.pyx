@@ -452,8 +452,14 @@ cdef int server_on_frame_recv(cnghttp2.nghttp2_session *session,
                 sys.stderr.write(traceback.format_exc())
                 return http2._rst_stream(frame.hd.stream_id)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK):
+        logging.debug('server_on_frame_recv, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
+        if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             http2._stop_settings_timer()
+    elif frame.hd.type == cnghttp2.NGHTTP2_PING:
+        if  (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) == 0b0:
+            #http2.send_ping(cnghttp2.NGHTTP2_FLAG_ACK, frame.ping.opaque_data)
+            #http2._stop_settings_timer()
+            pass
 
     return 0
 
@@ -490,7 +496,8 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
 
         http2.send_response(handler)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0:
+        logging.debug('server_on_frame_send, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
+        if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             return 0
         http2._start_settings_timer()
     elif frame.hd.type == cnghttp2.NGHTTP2_HEADERS:
@@ -500,6 +507,10 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
             if cnghttp2.nghttp2_session_get_stream_remote_close(
                     session, frame.hd.stream_id) == 0:
                 http2._rst_stream(frame.hd.stream_id, cnghttp2.NGHTTP2_NO_ERROR)
+    elif frame.hd.type == cnghttp2.NGHTTP2_PING:
+        if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) == 0b1:
+            return 0
+        http2._start_settings_timer()
 
 cdef int server_on_frame_not_send(cnghttp2.nghttp2_session *session,
                                   const cnghttp2.nghttp2_frame *frame,
@@ -688,7 +699,7 @@ cdef class _HTTP2SessionCoreBase:
         self.send_data()
 
     OUTBUF_MAX = 65535
-    SETTINGS_TIMEOUT = 5.0
+    SETTINGS_TIMEOUT = 10.0
 
     def send_data(self):
         cdef ssize_t outbuflen
@@ -880,6 +891,21 @@ cdef class _HTTP2SessionCore(_HTTP2SessionCoreBase):
                                             opaque_data, sizeof(body))
         if rv != 0:
             raise Exception('nghttp2_submit_goaway failed: {}'.format\
+                            (_strerror(rv)))
+
+    def send_ping(self, flag=cnghttp2.NGHTTP2_FLAG_ACK, body=b''):
+        cdef uint8_t opaque_data[8]
+        cdef int rv
+
+        opaque_data = <uint8_t*>body 
+
+        logging.debug('submit_ping, flag=%s, opaque_data=%s ', bin(flag), body) 
+        
+        rv = cnghttp2.nghttp2_submit_ping(self.session,
+                                            flag,
+                                            opaque_data)
+        if rv != 0:
+            raise Exception('nghttp2_submit_ping failed: {}'.format\
                             (_strerror(rv)))
 
     def send_response(self, handler):

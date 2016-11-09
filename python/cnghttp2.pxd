@@ -54,6 +54,7 @@ cdef extern from 'nghttp2/nghttp2.h':
         NGHTTP2_SETTINGS
         NGHTTP2_PUSH_PROMISE
         NGHTTP2_GOAWAY
+        NGHTTP2_PING
 
     ctypedef enum nghttp2_nv_flag:
         NGHTTP2_NV_FLAG_NONE
@@ -119,6 +120,10 @@ cdef extern from 'nghttp2/nghttp2.h':
         uint8_t *opaque_data
         size_t opaque_data_len
 
+    ctypedef struct nghttp2_ping:
+        nghttp2_frame_hd hd
+        uint8_t opaque_data[8]
+
     ctypedef union nghttp2_frame:
         nghttp2_frame_hd hd
         nghttp2_data data
@@ -126,6 +131,7 @@ cdef extern from 'nghttp2/nghttp2.h':
         nghttp2_rst_stream rst_stream
         nghttp2_push_promise push_promise
         nghttp2_goaway goaway
+        nghttp2_ping ping
 
     ctypedef ssize_t (*nghttp2_send_callback)\
         (nghttp2_session *session, const uint8_t *data, size_t length,
@@ -271,6 +277,9 @@ cdef extern from 'nghttp2/nghttp2.h':
                                          uint32_t error_code,
                                          const uint8_t *opaque_data,
                                          size_t opaque_data_len)
+
+    int nghttp2_submit_ping(nghttp2_session *session, uint8_t flags,
+                                         const uint8_t *opaque_data)
 
     int nghttp2_submit_settings(nghttp2_session *session, uint8_t flags,
                                 const nghttp2_settings_entry *iv, size_t niv)
