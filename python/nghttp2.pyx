@@ -423,7 +423,7 @@ cdef int server_on_frame_recv(cnghttp2.nghttp2_session *session,
                               const cnghttp2.nghttp2_frame *frame,
                               void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('server_on_frame_recv, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s server_on_frame_recv, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     if frame.hd.type == cnghttp2.NGHTTP2_DATA:
         if frame.hd.flags & cnghttp2.NGHTTP2_FLAG_END_STREAM:
@@ -452,7 +452,7 @@ cdef int server_on_frame_recv(cnghttp2.nghttp2_session *session,
                 sys.stderr.write(traceback.format_exc())
                 return http2._rst_stream(frame.hd.stream_id)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        logging.debug('server_on_frame_recv, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
+        logging.log(1,'%s server_on_frame_recv, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
         if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             http2._stop_settings_timer()
     elif frame.hd.type == cnghttp2.NGHTTP2_PING:
@@ -485,7 +485,7 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
                               const cnghttp2.nghttp2_frame *frame,
                               void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('server_on_frame_send, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s server_on_frame_send, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     if frame.hd.type == cnghttp2.NGHTTP2_PUSH_PROMISE:
         # For PUSH_PROMISE, send push response immediately
@@ -496,7 +496,7 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
 
         http2.send_response(handler)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        logging.debug('server_on_frame_send, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
+        logging.log(1, '%s server_on_frame_send, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
         if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             return 0
         http2._start_settings_timer()
@@ -517,7 +517,7 @@ cdef int server_on_frame_not_send(cnghttp2.nghttp2_session *session,
                                   int lib_error_code,
                                   void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('server_on_frame_not_send, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s server_on_frame_not_send, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     if frame.hd.type == cnghttp2.NGHTTP2_PUSH_PROMISE:
         # We have to remove handler here. Without this, it is not
@@ -533,7 +533,7 @@ cdef int on_stream_close(cnghttp2.nghttp2_session *session,
                                 uint32_t error_code,
                                 void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.debug('on_stream_close, stream_id:%s', stream_id)
+    logging.debug('%s on_stream_close, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
 
     handler = _get_stream_user_data(session, stream_id)
     if not handler:
@@ -605,7 +605,7 @@ cdef int client_on_frame_recv(cnghttp2.nghttp2_session *session,
                               const cnghttp2.nghttp2_frame *frame,
                               void *user_data):
     cdef http2 = <_HTTP2ClientSessionCore>user_data
-    logging.debug('client_on_frame_recv, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s client_on_frame_recv, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     if frame.hd.type == cnghttp2.NGHTTP2_DATA:
         if frame.hd.flags & cnghttp2.NGHTTP2_FLAG_END_STREAM:
