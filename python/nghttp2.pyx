@@ -1338,9 +1338,13 @@ if asyncio:
             asyncio.Protocol.__init__(self)
             self.RequestHandlerClass = RequestHandlerClass
             self.http2 = None
+            self.info_ip = None
+            self.info_port = None
 
         def connection_made(self, transport):
             address = transport.get_extra_info('peername')
+            self.info_ip = '{0}'.format(address[0])
+            self.info_port = '{0}'.format(address[1])
             logging.info('connection_made, address:%s, port:%s', address[0], address[1])
 
             self.transport = transport
@@ -1368,7 +1372,7 @@ if asyncio:
 
 
         def connection_lost(self, exc):
-            logging.info('connection_lost')
+            logging.info('connection_lost, address:{0}, port:{1}, exc:{2}'.format(self.info_ip, self.info_port, exc))
             if self.http2:
                 self.http2.connection_lost()
                 self.http2 = None
