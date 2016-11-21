@@ -349,7 +349,7 @@ cdef int server_on_header(cnghttp2.nghttp2_session *session,
                           uint8_t flags,
                           void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.debug('server_on_header, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s server_on_header, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     handler = _get_stream_user_data(session, frame.hd.stream_id)
     return on_header(name, namelen, value, valuelen, flags, handler)
@@ -361,7 +361,7 @@ cdef int client_on_header(cnghttp2.nghttp2_session *session,
                           uint8_t flags,
                           void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.debug('client_on_header, type:%s, stream_id:%s', frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s client_on_header, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     if frame.hd.type == cnghttp2.NGHTTP2_HEADERS:
         handler = _get_stream_user_data(session, frame.hd.stream_id)
@@ -533,7 +533,7 @@ cdef int on_stream_close(cnghttp2.nghttp2_session *session,
                                 uint32_t error_code,
                                 void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.debug('%s on_stream_close, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
+    logging.info('%s on_stream_close, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
 
     handler = _get_stream_user_data(session, stream_id)
     if not handler:
@@ -733,21 +733,21 @@ cdef class _HTTP2SessionCoreBase:
         self.inside_callback = False
 
     def _make_handler(self, stream_id):
-        logging.debug('_make_handler, stream_id:%s', stream_id)
         handler = self.handler_class(self, stream_id)
+        logging.info('%s:%s _make_handler', handler.remote_address, stream_id)
         self.handlers.add(handler)
         return handler
 
     def _remove_handler(self, handler):
-        logging.debug('_remove_handler, stream_id:%s', handler.stream_id)
+        logging.info('%s:%s _remove_handler', handler.remote_address, handler.stream_id)
         self.handlers.remove(handler)
 
     def _add_handler(self, handler, stream_id):
-        logging.debug('_add_handler, stream_id:%s', stream_id)
         handler.stream_id = stream_id
         handler.http2 = self
         handler.remote_address = self._get_remote_address()
         handler.client_certificate = self._get_client_certificate()
+        logging.info('%s:%s _add_handler', handler.remote_address, stream_id)
         self.handlers.add(handler)
 
     def _rst_stream(self, stream_id,
@@ -1368,7 +1368,6 @@ if asyncio:
 
 
         def connection_lost(self, exc):
-            logging.info('connection_lost')
             if self.http2:
                 self.http2.connection_lost()
                 self.http2 = None
@@ -1599,7 +1598,6 @@ if asyncio:
             self.http2.send_data()
 
         def connection_lost(self, exc):
-            logging.info('connection_lost')
             if self.http2:
                 self.http2 = None
             self.client.close()
