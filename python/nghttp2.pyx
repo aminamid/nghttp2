@@ -533,7 +533,7 @@ cdef int on_stream_close(cnghttp2.nghttp2_session *session,
                                 uint32_t error_code,
                                 void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.info('%s on_stream_close, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
+    logging.info('%s:%s on_stream_close', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
 
     handler = _get_stream_user_data(session, stream_id)
     if not handler:
@@ -734,12 +734,12 @@ cdef class _HTTP2SessionCoreBase:
 
     def _make_handler(self, stream_id):
         handler = self.handler_class(self, stream_id)
-        logging.info('%s:%s _make_handler', handler.remote_address, stream_id)
+        logging.info('%s:%s:%s _make_handler', handler.remote_address[0], handler.remote_address[1], stream_id)
         self.handlers.add(handler)
         return handler
 
     def _remove_handler(self, handler):
-        logging.info('%s:%s _remove_handler', handler.remote_address, handler.stream_id)
+        logging.info('%s:%s:%s _remove_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
         self.handlers.remove(handler)
 
     def _add_handler(self, handler, stream_id):
