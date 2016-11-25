@@ -260,6 +260,8 @@ try:
     import email.utils
     import datetime
     import time
+    import functools
+    import signal
     import ssl as tls
     from urllib.parse import urlparse
 except ImportError:
@@ -349,7 +351,6 @@ cdef int server_on_header(cnghttp2.nghttp2_session *session,
                           uint8_t flags,
                           void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.debug('%s server_on_header, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
 
     handler = _get_stream_user_data(session, frame.hd.stream_id)
     return on_header(name, namelen, value, valuelen, flags, handler)
@@ -423,7 +424,7 @@ cdef int server_on_frame_recv(cnghttp2.nghttp2_session *session,
                               const cnghttp2.nghttp2_frame *frame,
                               void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('%s server_on_frame_recv, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s:%s S<--C type:%s ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.stream_id, frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
 
     if frame.hd.type == cnghttp2.NGHTTP2_DATA:
         if frame.hd.flags & cnghttp2.NGHTTP2_FLAG_END_STREAM:
@@ -452,7 +453,6 @@ cdef int server_on_frame_recv(cnghttp2.nghttp2_session *session,
                 sys.stderr.write(traceback.format_exc())
                 return http2._rst_stream(frame.hd.stream_id)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        logging.log(1,'%s server_on_frame_recv, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
         if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             http2._stop_settings_timer()
     elif frame.hd.type == cnghttp2.NGHTTP2_PING:
@@ -485,7 +485,7 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
                               const cnghttp2.nghttp2_frame *frame,
                               void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('%s server_on_frame_send, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s:%s S-->C type:%s ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.stream_id, frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
 
     if frame.hd.type == cnghttp2.NGHTTP2_PUSH_PROMISE:
         # For PUSH_PROMISE, send push response immediately
@@ -496,7 +496,6 @@ cdef int server_on_frame_send(cnghttp2.nghttp2_session *session,
 
         http2.send_response(handler)
     elif frame.hd.type == cnghttp2.NGHTTP2_SETTINGS:
-        logging.log(1, '%s server_on_frame_send, type:%s, frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
         if (frame.hd.flags & cnghttp2.NGHTTP2_FLAG_ACK) != 0b0:
             return 0
         http2._start_settings_timer()
@@ -517,7 +516,7 @@ cdef int server_on_frame_not_send(cnghttp2.nghttp2_session *session,
                                   int lib_error_code,
                                   void *user_data):
     cdef http2 = <_HTTP2SessionCore>user_data
-    logging.debug('%s server_on_frame_not_send, type:%s, stream_id:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.type, frame.hd.stream_id)
+    logging.debug('%s:%s S--XC type:%s ACK:%s', '{0}:{1}'.format(*http2._get_remote_address()), frame.hd.stream_id, frame.hd.type, bin(frame.hd.flags&cnghttp2.NGHTTP2_FLAG_ACK))
 
     if frame.hd.type == cnghttp2.NGHTTP2_PUSH_PROMISE:
         # We have to remove handler here. Without this, it is not
@@ -747,7 +746,7 @@ cdef class _HTTP2SessionCoreBase:
         handler.http2 = self
         handler.remote_address = self._get_remote_address()
         handler.client_certificate = self._get_client_certificate()
-        logging.info('%s:%s _add_handler', handler.remote_address, stream_id)
+        logging.info('%s:%s:%s _add_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
         self.handlers.add(handler)
 
     def _rst_stream(self, stream_id,
@@ -1332,6 +1331,8 @@ if asyncio:
                  v if isinstance(v, bytes) else v.encode('utf-8')) \
                 for k, v in headers]
 
+    http2sessions={}
+
     class _HTTP2Session(asyncio.Protocol):
 
         def __init__(self, RequestHandlerClass):
@@ -1369,6 +1370,7 @@ if asyncio:
                 sys.stderr.write(traceback.format_exc())
                 self.transport.abort()
                 return
+            http2sessions["{0}:{1}".format(self.info_ip,self.info_port)]=self.http2
 
 
         def connection_lost(self, exc):
@@ -1376,6 +1378,7 @@ if asyncio:
             if self.http2:
                 self.http2.connection_lost()
                 self.http2 = None
+                del http2sessions["{0}:{1}".format(self.info_ip,self.info_port)]
 
         def data_received(self, data):
             try:
