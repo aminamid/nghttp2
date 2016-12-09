@@ -532,7 +532,7 @@ cdef int on_stream_close(cnghttp2.nghttp2_session *session,
                                 uint32_t error_code,
                                 void *user_data):
     cdef http2 = <_HTTP2SessionCoreBase>user_data
-    logging.info('%s:%s on_stream_close', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
+    logging.debug('%s:%s on_stream_close', '{0}:{1}'.format(*http2._get_remote_address()), stream_id)
 
     handler = _get_stream_user_data(session, stream_id)
     if not handler:
@@ -733,12 +733,12 @@ cdef class _HTTP2SessionCoreBase:
 
     def _make_handler(self, stream_id):
         handler = self.handler_class(self, stream_id)
-        logging.info('%s:%s:%s _make_handler', handler.remote_address[0], handler.remote_address[1], stream_id)
+        logging.debug('%s:%s:%s _make_handler', handler.remote_address[0], handler.remote_address[1], stream_id)
         self.handlers.add(handler)
         return handler
 
     def _remove_handler(self, handler):
-        logging.info('%s:%s:%s _remove_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
+        logging.debug('%s:%s:%s _remove_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
         self.handlers.remove(handler)
 
     def _add_handler(self, handler, stream_id):
@@ -746,7 +746,7 @@ cdef class _HTTP2SessionCoreBase:
         handler.http2 = self
         handler.remote_address = self._get_remote_address()
         handler.client_certificate = self._get_client_certificate()
-        logging.info('%s:%s:%s _add_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
+        logging.debug('%s:%s:%s _add_handler', handler.remote_address[0], handler.remote_address[1], handler.stream_id)
         self.handlers.add(handler)
 
     def _rst_stream(self, stream_id,
@@ -873,7 +873,6 @@ cdef class _HTTP2SessionCore(_HTTP2SessionCoreBase):
             raise Exception('nghttp2_submit_settings failed: {}'.format\
                             (_strerror(rv)))
 
-        
     def goaway(self, error_code=cnghttp2.NGHTTP2_NO_ERROR, body=b''):
         cdef uint8_t *opaque_data
         cdef int32_t last_stream_id
@@ -1371,6 +1370,7 @@ if asyncio:
                 self.transport.abort()
                 return
             http2sessions["{0}:{1}".format(self.info_ip,self.info_port)]=self.http2
+            logging.debug('remained sessions: {0}'.format(list(http2sessions.keys())))
 
 
         def connection_lost(self, exc):
@@ -1379,6 +1379,7 @@ if asyncio:
                 self.http2.connection_lost()
                 self.http2 = None
                 del http2sessions["{0}:{1}".format(self.info_ip,self.info_port)]
+            logging.debug('remained sessions: {0}'.format(list(http2sessions.keys())))
 
         def data_received(self, data):
             try:
